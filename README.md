@@ -1,2 +1,4 @@
 # treesync
-Synchronize or diff two directory trees
+
+Synchronize or diff two directory trees.
+
