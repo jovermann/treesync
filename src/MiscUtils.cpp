@@ -870,7 +870,7 @@ std::filesystem::file_time_type StatInfo::getMTime() const
 {
     using fs_seconds = std::chrono::duration<std::filesystem::file_time_type::rep>;
     using fs_nanoseconds = std::chrono::duration<std::filesystem::file_time_type::rep, std::nano>;
-    auto dur = fs_seconds(statData.st_mtimespec.tv_sec) + fs_nanoseconds(statData.st_mtimespec.tv_nsec);
+    auto dur = fs_seconds(getMTimeSpec().tv_sec) + fs_nanoseconds(getMTimeSpec().tv_nsec);
     return std::filesystem::file_time_type(dur);
 }
 

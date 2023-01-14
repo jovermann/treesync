@@ -14,6 +14,7 @@
 #include <string>
 #include <cctype>
 #include <regex>
+#include <filesystem>
 #include <sys/stat.h>
 
 #ifdef _WIN32
@@ -220,6 +221,16 @@ public:
     dev_t getDev() const { return statData.st_dev; }
     ino_t getIno() const { return statData.st_ino; }
     std::filesystem::file_time_type getMTime() const;
+
+    struct timespec getMTimeSpec() const
+    {
+#ifdef __linux__
+        return statData.st_mtim;
+#endif
+#ifdef __APPLE__
+        return statData.st_mtimespec;
+#endif
+    }
 
     struct stat statData;
 };
