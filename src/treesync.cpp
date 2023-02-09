@@ -381,10 +381,11 @@ int main(int argc, char* argv[])
         ut1::CommandLineParser cl("treesync", "Sync or diff two directory trees, recursively.\n"
                                   "\n"
                                   "Usage: $programName [OPTIONS] SRCDIR DSTDIR\n"
-                                  "\n",
+                                  "\n"
+                                  "Compare SRCDIR with DSTDIR and print differences (--diff or no option) or update DSTDIR in certain ways (--new, --delete or --update). SRCDIR is never modified.\n",
                                   "\n"
                                   "$programName version $version *** Copyright (c) 2022-2023 Johannes Overmann *** https://github.com/jovermann/treesync",
-                                  "0.1.0");
+                                  "0.1.2");
 
         cl.addHeader("\nFile/dir processing options:\n");
         cl.addOption('N', "new", "Copy files/dirs which only appear in SRCDIR into DSTDIR.");
@@ -396,6 +397,8 @@ int main(int argc, char* argv[])
         cl.addOption('F', "ignore-forks", "Ignore all files and dirs starting with '._' (Apple resource forks).");
         cl.addOption(' ', "follow-symlinks", "Follow symlinks. Without this (default) symlinks are compared as distinct filesystem objects.");
         cl.addOption('c', "create-missing-dst", "Create DSTDIR if it does not exist for --new/--update.");
+        cl.addOption(' ', "copy-ins", "Copy insertions to DIR during --diff. DSTDIR is not modified.", "DIR");
+        cl.addOption(' ', "copy-del", "Copy deletions to DIR during --diff. DSTDIR is not modified.", "DIR");
 //        cl.addOption('p', "preserve", "Copy mtime for --new and --update."); // todo
 
         cl.addHeader("\nMatching options:\n");
@@ -426,6 +429,8 @@ int main(int argc, char* argv[])
         bool noColor = cl("no-color");
         bool createMissingDst = cl("create-missing-dst");
         bool preserve = false; // cl("preserve"); // todo
+        std::string copyIns = cl.getStr("copy-ins");
+        std::string copyDel = cl.getStr("copy-del");
 
         // Determine mode.
         bool new_ = cl("new");
@@ -467,6 +472,28 @@ int main(int argc, char* argv[])
             if (diff)
             {
                 printDirectoryEntry(src, col.ins + "+ ", col.nor, params_.followSymlinks, showSubtree);
+                if (!copyIns.empty())
+                {
+                    if (!std::filesystem::exists(copyIns))
+                    {
+                        if (verbose)
+                        {
+                            std::cout << "Creating --copy-ins destination dir \"" << copyIns << "\"\n";
+                        }
+                        if (!dummyMode)
+                        {
+                            std::filesystem::create_directories(copyIns);
+                        }
+                    }
+                    if (verbose)
+                    {
+                        std::cout << "Copying (--copy-ins) " << ut1::getFileTypeStr(src, params_.followSymlinks) << " " << src.path() << " -> " << copyIns << "\n";
+                    }
+                    if (!dummyMode)
+                    {
+                        std::filesystem::copy(src.path(), copyIns, copy_options_base);
+                    }
+                }
             }
             if (new_)
             {
@@ -474,7 +501,6 @@ int main(int argc, char* argv[])
                 if (verbose)
                 {
                     std::cout << "Copying (new) " << ut1::getFileTypeStr(src, params_.followSymlinks) << " " << src.path() << " -> " << dst << "\n";
-
                 }
                 if (!dummyMode)
                 {
@@ -489,6 +515,28 @@ int main(int argc, char* argv[])
             if (diff)
             {
                 printDirectoryEntry(dst, col.del + "- ", col.nor, params_.followSymlinks, showSubtree);
+                if (!copyDel.empty())
+                {
+                    if (!std::filesystem::exists(copyDel))
+                    {
+                        if (verbose)
+                        {
+                            std::cout << "Creating --copy-ins destination dir \"" << copyDel << "\"\n";
+                        }
+                        if (!dummyMode)
+                        {
+                            std::filesystem::create_directories(copyDel);
+                        }
+                    }
+                    if (verbose)
+                    {
+                        std::cout << "Copying (--copy-del) " << ut1::getFileTypeStr(dst, params_.followSymlinks) << " " << dst.path() << " -> " << copyDel << "\n";
+                    }
+                    if (!dummyMode)
+                    {
+                        std::filesystem::copy(dst.path(), copyDel, copy_options_base);
+                    }
+                }
             }
             if (delete_)
             {
