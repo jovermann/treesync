@@ -65,6 +65,7 @@ public:
         std::string dstdir;
         bool ignoreDirs{};
         bool ignoreSpecial{};
+        bool ignoreForks{};
         bool followSymlinks{};
         bool ignoreContent{};
 
@@ -116,6 +117,10 @@ private:
         std::map<std::string, std::filesystem::directory_entry> srcmap;
         for (const std::filesystem::directory_entry &entry: std::filesystem::directory_iterator(src))
         {
+            if (params.ignoreForks && ut1::hasPrefix(entry.path().filename(), "._"))
+            {
+                continue;
+            }
             srcmap[entry.path().filename()] = entry;
         }
 
@@ -123,6 +128,10 @@ private:
         std::map<std::string, std::filesystem::directory_entry> dstmap;
         for (const std::filesystem::directory_entry &entry: std::filesystem::directory_iterator(dst))
         {
+            if (params.ignoreForks && ut1::hasPrefix(entry.path().filename(), "._"))
+            {
+                continue;
+            }
             dstmap[entry.path().filename()] = entry;
         }
 
@@ -384,6 +393,7 @@ int main(int argc, char* argv[])
         cl.addOption(' ', "diff", "Print differences and do not change anything. This is also the default if none of --new/--delete or --update are specified. Note: Differences are printed in the view of going from DSTDIR to SRCDIR, so usually treediff NEW OLD (unlike diff OLD NEW).");
         cl.addOption(' ', "ignore-dirs", "Just process the two specified directories. Ignore subdirectories.");
         cl.addOption(' ', "ignore-special", "Just process regular files, dirs and symbolic links. Ignore block/char devices, pipes and sockets.");
+        cl.addOption('F', "ignore-forks", "Ignore all files and dirs starting with '._' (Apple resource forks).");
         cl.addOption(' ', "follow-symlinks", "Follow symlinks. Without this (default) symlinks are compared as distinct filesystem objects.");
         cl.addOption('c', "create-missing-dst", "Create DSTDIR if it does not exist for --new/--update.");
 //        cl.addOption('p', "preserve", "Copy mtime for --new and --update."); // todo
@@ -447,6 +457,7 @@ int main(int argc, char* argv[])
         params.dstdir = cl.getArgs()[1];
         params.ignoreDirs = cl("ignore-dirs");
         params.ignoreSpecial = cl("ignore-special");
+        params.ignoreForks = cl("ignore-forks");
         params.followSymlinks = cl("follow-symlinks");
         params.ignoreContent = cl("ignore-content");
         std::filesystem::copy_options copy_options_base = params.followSymlinks ? std::filesystem::copy_options::none : std::filesystem::copy_options::copy_symlinks;
