@@ -707,6 +707,39 @@ UNIT_TEST(quouteRegexChars)
 }
 
 
+std::string toNfd(const std::string& s)
+{
+    // This only works for german umlauts so far.
+    std::string r;
+    for (size_t i = 0; i < s.length(); i++)
+    {
+        if ((s[i] == '\xc3') && (i < s.length() - 1))
+        {
+            switch (s[i + 1])
+            {
+            case '\x84': r += "A\xcc\x88"; i++; continue;
+            case '\x96': r += "O\xcc\x88"; i++; continue;
+            case '\x9c': r += "U\xcc\x88"; i++; continue;
+            case '\xa4': r += "a\xcc\x88"; i++; continue;
+            case '\xb6': r += "o\xcc\x88"; i++; continue;
+            case '\xbc': r += "u\xcc\x88"; i++; continue;
+            }
+        }
+        r += s[i];
+    }
+    return r;
+}
+
+
+UNIT_TEST(toNfd)
+{
+    ASSERT_EQ(ut1::toNfd(""), "");
+    ASSERT_EQ(ut1::toNfd("\xcc\x88"), "\xcc\x88");
+    ASSERT_EQ(ut1::toNfd("A\xcc\x88"), "A\xcc\x88");
+    ASSERT_EQ(ut1::toNfd("\xc3\x84"), "A\xcc\x88");
+}
+
+
 std::ostream& operator<<(std::ostream& s, const std::vector<std::string>& v)
 {
     s << "{";

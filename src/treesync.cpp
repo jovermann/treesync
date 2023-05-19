@@ -68,6 +68,7 @@ public:
         bool ignoreForks{};
         bool followSymlinks{};
         bool ignoreContent{};
+        bool normalizeFilenames{};
 
         /// Called for items which are in src only.
         std::function<void(const std::filesystem::directory_entry &, const std::filesystem::path &, Params&)> srcOnly;
@@ -121,7 +122,12 @@ private:
             {
                 continue;
             }
-            srcmap[entry.path().filename()] = entry;
+            std::string fname = entry.path().filename();
+            if (params.normalizeFilenames)
+            {
+                fname = ut1::toNfd(fname);
+            }
+            srcmap[fname] = entry;
         }
 
         // Read dst dir.
@@ -132,7 +138,12 @@ private:
             {
                 continue;
             }
-            dstmap[entry.path().filename()] = entry;
+            std::string fname = entry.path().filename();
+            if (params.normalizeFilenames)
+            {
+                fname = ut1::toNfd(fname);
+            }
+            dstmap[fname] = entry;
         }
 
         // Compare dirs by iterating over both lists simultaneously.
@@ -385,7 +396,7 @@ int main(int argc, char* argv[])
                                   "Compare SRCDIR with DSTDIR and print differences (--diff or no option) or update DSTDIR in certain ways (--new, --delete or --update). SRCDIR is never modified.\n",
                                   "\n"
                                   "$programName version $version *** Copyright (c) 2022-2023 Johannes Overmann *** https://github.com/jovermann/treesync",
-                                  "0.1.2");
+                                  "0.1.3");
 
         cl.addHeader("\nFile/dir processing options:\n");
         cl.addOption('N', "new", "Copy files/dirs which only appear in SRCDIR into DSTDIR.");
@@ -404,6 +415,7 @@ int main(int argc, char* argv[])
         cl.addHeader("\nMatching options:\n");
         cl.addOption('C', "ignore-content", "Ignore file content when comparing files. Just compare their size and assume files with the same size are identical.");
         cl.addOption('T', "ignore-mtime", "Ignore mtime for --update and always assume the SRC to be newer than DST if they are different, e.g. always overwrite DST with SRC if SRC and DST are different.");
+        cl.addOption('Z', "normalize-filenames", "Apply unicode canonical nornmalization (NFD) before comparing filenames. Specify this if you want different filenames which only differ in the NFC/NFD encoding to compare as equal.");
 
         cl.addHeader("\nVerbose / common options:\n");
         cl.addOption(' ', "show-matches", "Show matching files for --diff instead of only showing differences (default).");
@@ -465,6 +477,7 @@ int main(int argc, char* argv[])
         params.ignoreForks = cl("ignore-forks");
         params.followSymlinks = cl("follow-symlinks");
         params.ignoreContent = cl("ignore-content");
+        params.normalizeFilenames = cl("normalize-filenames");
         std::filesystem::copy_options copy_options_base = params.followSymlinks ? std::filesystem::copy_options::none : std::filesystem::copy_options::copy_symlinks;
 
         params.srcOnly = ([&](const std::filesystem::directory_entry &src, const std::filesystem::path &dstdir, TreeDiff::Params &params_)

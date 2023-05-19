@@ -86,6 +86,9 @@ void addTrailingLfIfMissing(std::string& s);
 /// regex special chars.
 std::string quoteRegexChars(const std::string& s);
 
+/// Convert UTF-8 to NFD (canonical decomposed form).
+std::string toNfd(const std::string& s);
+
 // --- String utilities: Misc. ---
 
 /// Split string at separator char.
