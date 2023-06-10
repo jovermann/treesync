@@ -415,7 +415,7 @@ int main(int argc, char* argv[])
         cl.addHeader("\nMatching options:\n");
         cl.addOption('C', "ignore-content", "Ignore file content when comparing files. Just compare their size and assume files with the same size are identical.");
         cl.addOption('T', "ignore-mtime", "Ignore mtime for --update and always assume the SRC to be newer than DST if they are different, e.g. always overwrite DST with SRC if SRC and DST are different.");
-        cl.addOption('Z', "normalize-filenames", "Apply unicode canonical nornmalization (NFD) before comparing filenames. Specify this if you want different filenames which only differ in the NFC/NFD encoding to compare as equal.");
+        cl.addOption('Z', "normalize-filenames", "Apply unicode canonical normalization (NFD) before comparing filenames. Specify this if you want different filenames which only differ in the NFC/NFD encoding to compare as equal.");
 
         cl.addHeader("\nVerbose / common options:\n");
         cl.addOption(' ', "show-matches", "Show matching files for --diff instead of only showing differences (default).");
