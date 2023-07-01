@@ -861,7 +861,54 @@ FileType getFileType(const std::filesystem::directory_entry& entry, bool followS
     }
 }
 
+FileType getFileType(const std::filesystem::path& entry, bool followSymlinks)
+{
+    // First check for symlink.
+    // is_symlink() never follows symlinks, while all other is_*() functions follow symlinks.
+    if (std::filesystem::is_symlink(entry))
+    {
+        // Report broken symlinks as symlink, even when when following symlinks.
+        if ((!followSymlinks) || (!std::filesystem::exists(entry)))
+        {
+            return FT_SYMLINK;
+        }
+    }
+    if (std::filesystem::is_regular_file(entry))
+    {
+        return FT_REGULAR;
+    }
+    else if (std::filesystem::is_directory(entry))
+    {
+        return FT_DIR;
+    }
+    else if (std::filesystem::is_fifo(entry))
+    {
+        return FT_FIFO;
+    }
+    else if (std::filesystem::is_block_file(entry))
+    {
+        return FT_BLOCK;
+    }
+    else if (std::filesystem::is_character_file(entry))
+    {
+        return FT_CHAR;
+    }
+    else if (std::filesystem::is_socket(entry))
+    {
+        return FT_SOCKET;
+    }
+    else
+    {
+        return FT_NON_EXISTING;
+    }
+}
+
 std::string getFileTypeStr(const std::filesystem::directory_entry& entry, bool followSymlinks)
+{
+    return getFileTypeStr(getFileType(entry, followSymlinks));
+}
+
+std::string getFileTypeStr(const std::filesystem::path& entry, bool followSymlinks)
 {
     return getFileTypeStr(getFileType(entry, followSymlinks));
 }

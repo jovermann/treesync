@@ -205,9 +205,11 @@ enum FileType { FT_REGULAR, FT_DIR, FT_SYMLINK, FT_FIFO, FT_BLOCK, FT_CHAR, FT_S
 
 /// Get file type.
 FileType getFileType(const std::filesystem::directory_entry& entry, bool followSymlinks = true);
+FileType getFileType(const std::filesystem::path& entry, bool followSymlinks = true);
 
 /// Get file type string.
 std::string getFileTypeStr(const std::filesystem::directory_entry& entry, bool followSymlinks = true);
+std::string getFileTypeStr(const std::filesystem::path& entry, bool followSymlinks = true);
 
 /// Get file type string.
 std::string getFileTypeStr(FileType fileType);
