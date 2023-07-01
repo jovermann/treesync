@@ -214,6 +214,13 @@ std::string getFileTypeStr(const std::filesystem::path& entry, bool followSymlin
 /// Get file type string.
 std::string getFileTypeStr(FileType fileType);
 
+/// Return true iff entry exists.
+/// This returns true for broken symlinks.
+bool fsExists(const std::filesystem::path& entry);
+
+/// Return true iff entry is a directory.
+bool fsIsDirectory(const std::filesystem::path& entry, bool followSymlinks = true);
+
 /// File stat() info.
 /// This is only used to access stuff which is not accessible through std::filesystem::file_status (major/minor for block devices and st_dev/st_ino for inode identity (hardlink groups)).
 class StatInfo

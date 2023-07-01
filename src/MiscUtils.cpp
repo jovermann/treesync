@@ -929,6 +929,16 @@ std::string getFileTypeStr(FileType fileType)
     return "unknown-file-type";
 }
 
+bool fsExists(const std::filesystem::path& entry)
+{
+    return std::filesystem::exists(entry) || std::filesystem::is_symlink(entry);
+}
+
+bool fsIsDirectory(const std::filesystem::path& entry, bool followSymlinks)
+{
+    return getFileType(entry, followSymlinks) == FT_DIR;
+}
+
 StatInfo::StatInfo()
 {
     statData = {};
