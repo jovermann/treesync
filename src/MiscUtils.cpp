@@ -867,7 +867,7 @@ FileType getFileType(const std::filesystem::path& entry, bool followSymlinks)
     // is_symlink() never follows symlinks, while all other is_*() functions follow symlinks.
     if (std::filesystem::is_symlink(entry))
     {
-        // Report broken symlinks as symlink, even when when following symlinks.
+        // Report broken symlinks as symlink, even when following symlinks.
         if ((!followSymlinks) || (!std::filesystem::exists(entry)))
         {
             return FT_SYMLINK;
@@ -937,6 +937,11 @@ bool fsExists(const std::filesystem::path& entry)
 bool fsIsDirectory(const std::filesystem::path& entry, bool followSymlinks)
 {
     return getFileType(entry, followSymlinks) == FT_DIR;
+}
+
+bool fsIsRegular(const std::filesystem::path& entry, bool followSymlinks)
+{
+    return getFileType(entry, followSymlinks) == FT_REGULAR;
 }
 
 StatInfo::StatInfo()

@@ -406,7 +406,7 @@ void printDirectoryEntry(const std::filesystem::directory_entry &entry, const st
 /// This functions prints verbose messages and honours dummy mode.
 void mkDirs(const std::filesystem::path &dir, bool verbose, const std::string& verbosePrefix, bool dummyMode)
 {
-    if (!ut1::fsExists(dir))
+    if ((!ut1::fsExists(dir)) || dummyMode)
     {
         if (verbose)
         {
@@ -471,8 +471,8 @@ void copyRecursive(const std::filesystem::directory_entry &src, const std::files
 
     std::filesystem::path dst = dstdir / src.path().filename();
 
-    // overwrite_existing does not replace symlinks or directories etc, so delete the destination first if it exists.
-    if (bool(copy_options & std::filesystem::copy_options::overwrite_existing) && ut1::fsExists(dst))
+    // overwrite_existing does not replace symlinks or directories etc, so delete the destination first if it exists, unless both are regular files.
+    if (bool(copy_options & std::filesystem::copy_options::overwrite_existing) && ut1::fsExists(dst) && ((!ut1::fsIsRegular(src, params.followSymlinks)) || (!ut1::fsIsRegular(dst, /*followSymlinks=*/false))))
     {
         removeRecursive(dst, verbose, verbosePrefix  + ": Deleting", params.followSymlinks, dummyMode);
     }
@@ -515,9 +515,11 @@ int main(int argc, char* argv[])
                                   "Compare SRCDIR with DSTDIR and print differences (--diff or no option) or update DSTDIR in certain ways (--new, --delete or --update). SRCDIR is never modified.\n",
                                   "\n"
                                   "$programName version $version *** Copyright (c) 2022-2023 Johannes Overmann *** https://github.com/jovermann/treesync",
-                                  "0.1.6");
+                                  "0.1.7");
 
         cl.addHeader("\nFile/dir processing options:\n");
+        cl.addOption('s', "sync", "Synchronize DSTDIR with SRCDIR. Make DSTDIR look like SRCDIR. This is a shortcut for --new --delete --update (-NDU). Add --ignore-forks --ignore-content --ignore-mtime --normalize-filenames (-FCTZ) to modify the sync behavior.");
+        cl.addOption('S', "sync-fast", "Synchronize DSTDIR with SRCDIR, ignoring mtime, content and resource forks and normalize unicode filenames. Make DSTDIR look like SRCDIR. This is a shortcut for --new --delete --update --ignore-forks --ignore-content --ignore-mtime --normalize-filenames (-NDUFCTZ).");
         cl.addOption('N', "new", "Copy files/dirs which only appear in SRCDIR into DSTDIR.");
         cl.addOption('D', "delete", "Delete files/dirs in DSTDIR which do not appear in SRCDIR.");
         cl.addOption('U', "update", "Copy files/dirs which either only appear in SRCDIR or which are newer (mtime) than the corresponding file in DSTDIR or which differ in type into DSTDIR. Implies --new.");
@@ -552,6 +554,25 @@ int main(int argc, char* argv[])
             cl.error("Please specify SRCDIR and DSTDIR.\n");
         }
 
+        // Apply high level implications.
+        if (cl("sync") || cl("sync-fast"))
+        {
+            cl.setOption("new");
+            cl.setOption("delete");
+            cl.setOption("update");
+        }
+        if (cl("sync-fast"))
+        {
+            cl.setOption("ignore-forks");
+            cl.setOption("ignore-content");
+            cl.setOption("ignore-mtime");
+            cl.setOption("normalize-filenames");
+        }
+        if (cl("update"))
+        {
+            cl.setOption("new");
+        }
+
         // Get options.
         unsigned verbose = unsigned(cl.getUInt("verbose"));
         bool showMatches = cl("show-matches");
@@ -573,11 +594,6 @@ int main(int argc, char* argv[])
         {
             // No mode specified. Assume --diff.
             diff = true;
-        }
-        if (update)
-        {
-            // --update implies --new.
-            new_ = true;
         }
 
         TerminalColors col(noColor);
@@ -639,15 +655,18 @@ int main(int argc, char* argv[])
             {
                 if ((!ignoreMtime) && (ut1::getLastWriteTime(src, params_.followSymlinks) > ut1::getLastWriteTime(dst, params_.followSymlinks)))
                 {
-                    if (verbose)
-                    {
-                        std::cout << "Updating mtime " << ut1::getFileTypeStr(src, params_.followSymlinks) << " " << src.path() << " -> " << dst.path() << "\n";
-                    }
                     if (!dummyMode)
                     {
                         if (preserve)
                         {
-                            ut1::setLastWriteTime(dst, ut1::getLastWriteTime(src, params_.followSymlinks), params_.followSymlinks);
+                            if (verbose)
+                            {
+                                std::cout << "Updating mtime " << ut1::getFileTypeStr(src, params_.followSymlinks) << " " << src.path() << " -> " << dst.path() << "\n";
+                            }
+                            if (!dummyMode)
+                            {
+                                ut1::setLastWriteTime(dst, ut1::getLastWriteTime(src, params_.followSymlinks), params_.followSymlinks);
+                            }
                         }
                     }
                 }

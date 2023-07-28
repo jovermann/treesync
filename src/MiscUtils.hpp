@@ -221,6 +221,9 @@ bool fsExists(const std::filesystem::path& entry);
 /// Return true iff entry is a directory.
 bool fsIsDirectory(const std::filesystem::path& entry, bool followSymlinks = true);
 
+/// Return true iff entry is a regular file.
+bool fsIsRegular(const std::filesystem::path& entry, bool followSymlinks = true);
+
 /// File stat() info.
 /// This is only used to access stuff which is not accessible through std::filesystem::file_status (major/minor for block devices and st_dev/st_ino for inode identity (hardlink groups)).
 class StatInfo

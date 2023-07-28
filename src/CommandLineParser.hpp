@@ -123,6 +123,9 @@ public:
     /// This is useful to set logical non-static default values.
     void setValue(const std::string& longOption, const std::string& value, bool clearList = true);
 
+    /// Set bool option (to true by default).
+    void setOption(const std::string& longOption, bool value = true) { setValue(longOption, value ? "1" : "0"); }
+
     /// Print error and exit.
     [[noreturn]] void error(const std::string& message, int exitStatus = 1) const;
 
