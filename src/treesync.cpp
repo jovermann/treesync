@@ -65,7 +65,8 @@ public:
         std::string dstdir;
         bool ignoreDirs{};
         bool ignoreSpecial{};
-        bool ignoreForks{};
+        bool ignoreForksSrc{};
+        bool ignoreForksDst{};
         bool followSymlinks{};
         bool ignoreContent{};
         bool normalizeFilenames{};
@@ -102,6 +103,19 @@ public:
     {
     }
 
+    /// Return true iff file/dir should be ignored.
+    static bool ignoreSrcFile(const std::string& filename, const TreeDiff::Params& params)
+    {
+        return params.ignoreForksSrc && ut1::hasPrefix(filename, "._");
+    }
+
+    /// Return true iff file/dir should be ignored.
+    static bool ignoreDstFile(const std::string& filename, const TreeDiff::Params& params)
+    {
+        return params.ignoreForksDst && ut1::hasPrefix(filename, "._");
+    }
+
+    /// Process directory trees recursively.
     void process()
     {
         processDir(std::filesystem::directory_entry(params.srcdir), std::filesystem::directory_entry(params.dstdir));
@@ -118,7 +132,7 @@ private:
         std::map<std::string, std::filesystem::directory_entry> srcmap;
         for (const std::filesystem::directory_entry &entry: std::filesystem::directory_iterator(src))
         {
-            if (params.ignoreForks && ut1::hasPrefix(entry.path().filename(), "._"))
+            if (ignoreSrcFile(entry.path().filename(), params))
             {
                 continue;
             }
@@ -136,7 +150,7 @@ private:
         {
             for (const std::filesystem::directory_entry &entry: std::filesystem::directory_iterator(dst))
             {
-                if (params.ignoreForks && ut1::hasPrefix(entry.path().filename(), "._"))
+                if (ignoreDstFile(entry.path().filename(), params))
                 {
                     continue;
                 }
@@ -369,16 +383,21 @@ private:
 
 
 /// Print directory entry.
-void printDirectoryEntry(const std::filesystem::directory_entry &entry, const std::string &prefix, const std::string &suffix, bool followSymlinks, bool recursive)
+void printDirectoryEntry(const std::filesystem::directory_entry &entry, const std::string &prefix, const std::string &suffix, const TreeDiff::Params& params, bool recursive, bool src)
 {
-    std::cout << prefix << ut1::getFileTypeStr(entry, followSymlinks) << " " << entry.path() << suffix << "\n";
+    if (src ? TreeDiff::ignoreSrcFile(entry.path().filename(), params) : TreeDiff::ignoreDstFile(entry.path().filename(), params))
+    {
+        return;
+    }
+
+    std::cout << prefix << ut1::getFileTypeStr(entry, params.followSymlinks) << " " << entry.path() << suffix << "\n";
     if (!recursive || !entry.is_directory())
     {
         return;
     }
     for (const std::filesystem::directory_entry &entry_: std::filesystem::directory_iterator(entry))
     {
-        printDirectoryEntry(entry_, prefix, suffix, followSymlinks, recursive);
+        printDirectoryEntry(entry_, prefix, suffix, params, recursive, src);
     }
 }
 
@@ -443,14 +462,19 @@ void removeRecursive(const std::filesystem::path &dst, bool verbose, const std::
 /// - Honour dummy mode.
 /// - Overwrite symlinks and dirs on overwrite_existing.
 /// - Always recursive.
-void copyRecursive(const std::filesystem::directory_entry &src, const std::filesystem::path &dstdir, std::filesystem::copy_options copy_options, bool verbose, const std::string& verbosePrefix, bool followSymlinks, bool dummyMode)
+void copyRecursive(const std::filesystem::directory_entry &src, const std::filesystem::path &dstdir, std::filesystem::copy_options copy_options, bool verbose, const std::string& verbosePrefix, const TreeDiff::Params& params, bool dummyMode)
 {
+    if (TreeDiff::ignoreSrcFile(src.path().filename(), params))
+    {
+        return;
+    }
+
     std::filesystem::path dst = dstdir / src.path().filename();
 
     // overwrite_existing does not replace symlinks or directories etc, so delete the destination first if it exists.
     if (bool(copy_options & std::filesystem::copy_options::overwrite_existing) && ut1::fsExists(dst))
     {
-        removeRecursive(dst, verbose, verbosePrefix  + ": Deleting", followSymlinks, dummyMode);
+        removeRecursive(dst, verbose, verbosePrefix  + ": Deleting", params.followSymlinks, dummyMode);
     }
 
     if (src.is_directory())
@@ -458,14 +482,14 @@ void copyRecursive(const std::filesystem::directory_entry &src, const std::files
         mkDirs(dst, verbose, verbosePrefix + ": Creating dir", dummyMode);
         for (const std::filesystem::directory_entry &src_: std::filesystem::directory_iterator(src))
         {
-            copyRecursive(src_, dst, copy_options, verbose, verbosePrefix, followSymlinks, dummyMode);
+            copyRecursive(src_, dst, copy_options, verbose, verbosePrefix, params, dummyMode);
         }
     }
     else
     {
         if (verbose)
         {
-            std::cout << verbosePrefix << " " << ut1::getFileTypeStr(src, followSymlinks) << " " << src.path() << " -> " << dst << "\n";
+            std::cout << verbosePrefix << " " << ut1::getFileTypeStr(src, params.followSymlinks) << " " << src.path() << " -> " << dst << "\n";
         }
         if (!dummyMode)
         {
@@ -491,7 +515,7 @@ int main(int argc, char* argv[])
                                   "Compare SRCDIR with DSTDIR and print differences (--diff or no option) or update DSTDIR in certain ways (--new, --delete or --update). SRCDIR is never modified.\n",
                                   "\n"
                                   "$programName version $version *** Copyright (c) 2022-2023 Johannes Overmann *** https://github.com/jovermann/treesync",
-                                  "0.1.5");
+                                  "0.1.6");
 
         cl.addHeader("\nFile/dir processing options:\n");
         cl.addOption('N', "new", "Copy files/dirs which only appear in SRCDIR into DSTDIR.");
@@ -500,7 +524,8 @@ int main(int argc, char* argv[])
         cl.addOption(' ', "diff", "Print differences and do not change anything. This is also the default if none of --new/--delete or --update are specified. Note: Differences are printed in the view of going from DSTDIR to SRCDIR, so usually treediff NEW OLD (unlike diff OLD NEW).");
         cl.addOption(' ', "ignore-dirs", "Just process the two specified directories. Ignore subdirectories.");
         cl.addOption(' ', "ignore-special", "Just process regular files, dirs and symbolic links. Ignore block/char devices, pipes and sockets.");
-        cl.addOption('F', "ignore-forks", "Ignore all files and dirs starting with '._' (Apple resource forks).");
+        cl.addOption('F', "ignore-forks", "Ignore all files and dirs in SRCDIR starting with '._' (Apple resource forks).");
+        cl.addOption(' ', "ignore-forks-dst", "Ignore all files and dirs in DSTDIR starting with '._' (Apple resource forks). Specify this if -D should not remove forks in DSTDIR.");
         cl.addOption(' ', "follow-symlinks", "Follow symlinks. Without this (default) symlinks are compared as distinct filesystem objects.");
         cl.addOption('c', "create-missing-dst", "Create DSTDIR if it does not exist for --new/--update.");
         cl.addOption(' ', "copy-ins", "Copy insertions to DIR during --diff. DSTDIR is not modified.", "DIR");
@@ -562,7 +587,8 @@ int main(int argc, char* argv[])
         params.dstdir = cl.getArgs()[1];
         params.ignoreDirs = cl("ignore-dirs");
         params.ignoreSpecial = cl("ignore-special");
-        params.ignoreForks = cl("ignore-forks");
+        params.ignoreForksSrc = cl("ignore-forks");
+        params.ignoreForksDst = cl("ignore-forks-dst");
         params.followSymlinks = cl("follow-symlinks");
         params.ignoreContent = cl("ignore-content");
         params.normalizeFilenames = cl("normalize-filenames");
@@ -572,16 +598,16 @@ int main(int argc, char* argv[])
         {
             if (diff)
             {
-                printDirectoryEntry(src, col.ins + "+ ", col.nor, params_.followSymlinks, showSubtree);
+                printDirectoryEntry(src, col.ins + "+ ", col.nor, params_, showSubtree, /*src=*/true);
                 if (!copyIns.empty())
                 {
                     mkDirs(copyIns, verbose, "Creating --copy-ins destination dir", dummyMode);
-                    copyRecursive(src, copyIns, std::filesystem::copy_options::overwrite_existing | copy_options_base, verbose, "Copying (--copy-ins)", params_.followSymlinks, dummyMode);
+                    copyRecursive(src, copyIns, std::filesystem::copy_options::overwrite_existing | copy_options_base, verbose, "Copying (--copy-ins)", params_, dummyMode);
                 }
             }
             if (new_)
             {
-                copyRecursive(src, dstdir, copy_options_base, verbose, "Copying (new)", params_.followSymlinks, dummyMode);
+                copyRecursive(src, dstdir, copy_options_base, verbose, "Copying (new)", params_, dummyMode);
             }
         });
 
@@ -590,11 +616,11 @@ int main(int argc, char* argv[])
             (void)srcdir;
             if (diff)
             {
-                printDirectoryEntry(dst, col.del + "- ", col.nor, params_.followSymlinks, showSubtree);
+                printDirectoryEntry(dst, col.del + "- ", col.nor, params_, showSubtree, /*src=*/false);
                 if (!copyDel.empty())
                 {
                     mkDirs(copyDel, verbose, "Creating --copy-del destination dir", dummyMode);
-                    copyRecursive(dst, copyDel, std::filesystem::copy_options::overwrite_existing | copy_options_base, verbose, "Copying (--copy-del)", params_.followSymlinks, dummyMode);
+                    copyRecursive(dst, copyDel, std::filesystem::copy_options::overwrite_existing | copy_options_base, verbose, "Copying (--copy-del)", params_, dummyMode);
                 }
             }
             if (delete_)
@@ -657,7 +683,7 @@ int main(int argc, char* argv[])
             {
                 if (ignoreMtime || (ut1::getLastWriteTime(src, params_.followSymlinks) > ut1::getLastWriteTime(dst, params_.followSymlinks)))
                 {
-                    copyRecursive(src, dst.path().parent_path(), std::filesystem::copy_options::overwrite_existing | copy_options_base, verbose, "Copying (update)", params_.followSymlinks, dummyMode);
+                    copyRecursive(src, dst.path().parent_path(), std::filesystem::copy_options::overwrite_existing | copy_options_base, verbose, "Copying (update)", params_, dummyMode);
                 }
             }
         });
@@ -670,7 +696,7 @@ int main(int argc, char* argv[])
             }
             if (update)
             {
-                copyRecursive(src, dst.path().parent_path(), std::filesystem::copy_options::overwrite_existing | copy_options_base, verbose, "Copying (type mismatch)", params_.followSymlinks, dummyMode);
+                copyRecursive(src, dst.path().parent_path(), std::filesystem::copy_options::overwrite_existing | copy_options_base, verbose, "Copying (type mismatch)", params_, dummyMode);
             }
         });
 
