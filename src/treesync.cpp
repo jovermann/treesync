@@ -515,15 +515,16 @@ int main(int argc, char* argv[])
                                   "Compare SRCDIR with DSTDIR and print differences (--diff or no option) or update DSTDIR in certain ways (--new, --delete or --update). SRCDIR is never modified.\n",
                                   "\n"
                                   "$programName version $version *** Copyright (c) 2022-2023 Johannes Overmann *** https://github.com/jovermann/treesync",
-                                  "0.1.7");
+                                  "0.1.8");
 
         cl.addHeader("\nFile/dir processing options:\n");
+        cl.addOption(' ', "diff", "Print differences and do not change anything. This is also the default if none of --new/--delete or --update are specified. Note: Differences are printed in the view of going from DSTDIR to SRCDIR, so usually treesync NEW OLD (unlike diff OLD NEW).");
+        cl.addOption(' ', "diff-fast", "Like --diff but ignore mtime, content and resource forks and normalize unicode filenames, like --diff --ignore-forks --ignore-content --ignore-mtime --normalize-filenames).");
         cl.addOption('s', "sync", "Synchronize DSTDIR with SRCDIR. Make DSTDIR look like SRCDIR. This is a shortcut for --new --delete --update (-NDU). Add --ignore-forks --ignore-content --ignore-mtime --normalize-filenames (-FCTZ) to modify the sync behavior.");
         cl.addOption('S', "sync-fast", "Synchronize DSTDIR with SRCDIR, ignoring mtime, content and resource forks and normalize unicode filenames. Make DSTDIR look like SRCDIR. This is a shortcut for --new --delete --update --ignore-forks --ignore-content --ignore-mtime --normalize-filenames (-NDUFCTZ).");
         cl.addOption('N', "new", "Copy files/dirs which only appear in SRCDIR into DSTDIR.");
         cl.addOption('D', "delete", "Delete files/dirs in DSTDIR which do not appear in SRCDIR.");
         cl.addOption('U', "update", "Copy files/dirs which either only appear in SRCDIR or which are newer (mtime) than the corresponding file in DSTDIR or which differ in type into DSTDIR. Implies --new.");
-        cl.addOption(' ', "diff", "Print differences and do not change anything. This is also the default if none of --new/--delete or --update are specified. Note: Differences are printed in the view of going from DSTDIR to SRCDIR, so usually treediff NEW OLD (unlike diff OLD NEW).");
         cl.addOption(' ', "ignore-dirs", "Just process the two specified directories. Ignore subdirectories.");
         cl.addOption(' ', "ignore-special", "Just process regular files, dirs and symbolic links. Ignore block/char devices, pipes and sockets.");
         cl.addOption('F', "ignore-forks", "Ignore all files and dirs in SRCDIR starting with '._' (Apple resource forks).");
@@ -571,6 +572,14 @@ int main(int argc, char* argv[])
         if (cl("update"))
         {
             cl.setOption("new");
+        }
+        if (cl("diff-fast"))
+        {
+            cl.setOption("diff");
+            cl.setOption("ignore-forks");
+            cl.setOption("ignore-content");
+            cl.setOption("ignore-mtime");
+            cl.setOption("normalize-filenames");
         }
 
         // Get options.
