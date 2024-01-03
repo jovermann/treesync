@@ -480,7 +480,17 @@ void copyRecursive(const std::filesystem::directory_entry &src, const std::files
     if (src.is_directory())
     {
         mkDirs(dst, verbose, verbosePrefix + ": Creating dir", dummyMode);
+
+	// Read dir.
+	std::vector<std::filesystem::directory_entry> entries;
         for (const std::filesystem::directory_entry &src_: std::filesystem::directory_iterator(src))
+	{
+	    entries.push_back(src_);
+	}
+
+	// Sort entries and copy in sorted order so listing in unsorted order (simple devices) looks nice.
+	std::sort(entries.begin(), entries.end());
+	for (const std::filesystem::directory_entry &src_: entries)
         {
             copyRecursive(src_, dst, copy_options, verbose, verbosePrefix, params, dummyMode);
         }
@@ -515,7 +525,7 @@ int main(int argc, char* argv[])
                                   "Compare SRCDIR with DSTDIR and print differences (--diff or no option) or update DSTDIR in certain ways (--new, --delete or --update). SRCDIR is never modified.\n",
                                   "\n"
                                   "$programName version $version *** Copyright (c) 2022-2023 Johannes Overmann *** https://github.com/jovermann/treesync",
-                                  "0.1.8");
+                                  "0.1.9");
 
         cl.addHeader("\nFile/dir processing options:\n");
         cl.addOption(' ', "diff", "Print differences and do not change anything. This is also the default if none of --new/--delete or --update are specified. Note: Differences are printed in the view of going from DSTDIR to SRCDIR, so usually treesync NEW OLD (unlike diff OLD NEW).");
