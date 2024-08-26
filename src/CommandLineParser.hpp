@@ -1,12 +1,11 @@
 // Command line parser.
 //
-// Copyright (c) 2021-2022 Johannes Overmann
+// Copyright (c) 2021-2024 Johannes Overmann
 //
 // Distributed under the Boost Software License, Version 1.0.
-// (See accompanying file LICENSE_1_0.txt or copy at https://www.boost.org/LICENSE_1_0.txt)
+// (See accompanying file LICENSE or copy at https://www.boost.org/LICENSE_1_0.txt)
 
-#ifndef include_CommandLineParser_hpp
-#define include_CommandLineParser_hpp
+#pragma once
 
 #include <string>
 #include <vector>
@@ -87,7 +86,8 @@ public:
     /// Parse command line.
     /// By default parse() does not return for --help/--version or on errors.
     /// Return 0 on success.
-    void parse(int argc, char* argv[]);
+    void parse(int argc, const char* argv[]);
+    void parse(int argc, char* argv[]) { parse(argc, const_cast<const char **>(argv)); }
 
     /// Get switch value.
     bool operator()(const std::string& longOption) const { return isSet(longOption); }
@@ -149,10 +149,10 @@ private:
     Option* getShortOption(char shortOption);
 
     /// Parse long option in argv[i], potentially consuming an argument in argv[++i].
-    void parseLongOption(int argc, char* argv[], int& i);
+    void parseLongOption(int argc, const char* argv[], int& i);
 
     /// Parse short options in argv[i], potentially consuming an argument in argv[++i].
-    void parseShortOptions(int argc, char* argv[], int& i);
+    void parseShortOptions(int argc, const char* argv[], int& i);
 
     /// Options.
     std::map<std::string, Option> options;
@@ -189,6 +189,3 @@ private:
 
 
 } // namespace ut1
-
-
-#endif /* include_CommandLineParser_hpp */

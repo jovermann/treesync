@@ -1,12 +1,11 @@
 // Misc utility functions.
 //
-// Copyright (c) 2021-2022 Johannes Overmann
+// Copyright (c) 2021-2024 Johannes Overmann
 //
 // Distributed under the Boost Software License, Version 1.0.
-// (See accompanying file LICENSE_1_0.txt or copy at https://www.boost.org/LICENSE_1_0.txt)
+// (See accompanying file LICENSE or copy at https://www.boost.org/LICENSE_1_0.txt)
 
-#ifndef include_MiscUtils_hpp
-#define include_MiscUtils_hpp
+#pragma once
 
 #include <sstream>
 #include <fstream>
@@ -16,10 +15,13 @@
 #include <regex>
 #include <filesystem>
 #include <sys/stat.h>
+#include <string_view>
 
+// --- Windows support ---
 #ifdef _WIN32
 using ssize_t = ptrdiff_t;
 #define isatty(fd) ((fd) == 1)
+#define __PRETTY_FUNCTION__ __FUNCSIG__
 #endif
 
 namespace ut1
@@ -176,6 +178,18 @@ inline std::string toStr(const char* s)
     return "(const char*)" + expandUnprintable(s, '"', '"');
 }
 
+/// Hexlify binary string.
+inline std::string hexlify(const std::vector<uint8_t> &bytes)
+{
+    std::stringstream os;
+    os << std::hex << std::setfill('0') << std::nouppercase;
+    for (uint8_t byte : bytes)
+    {
+        os << std::setw(2) << unsigned(byte);
+    }
+    return os.str();
+}
+
 /// Flush output stream, but only if:
 /// 1. it is std::cout.
 /// 2. it is connected to a TTY.
@@ -191,6 +205,14 @@ inline std::string pluralS(size_t n, const std::string& pluralSuffix = "s", cons
     return (n == 1) ? singularSuffix : pluralSuffix;
 }
 
+/// Get type name.
+template<typename T> constexpr std::string_view typeNameHelper() { return __PRETTY_FUNCTION__; }
+template<typename T>
+constexpr std::string_view typeName()
+{
+    constexpr std::string_view name = typeNameHelper<T>();
+    return name.substr(typeNameHelper<void>().find("void"), name.length() - typeNameHelper<void>().length() + 4);
+}
 
 // --- File utilities. ---
 
@@ -259,6 +281,12 @@ std::filesystem::file_time_type getLastWriteTime(const std::filesystem::director
 /// Set last write time (as in std::filesystem::last_write_time()).
 void setLastWriteTime(const std::filesystem::directory_entry& entry, std::filesystem::file_time_type new_time, bool followSymlinks = true);
 
-} // namespace ut1
+// --- Misc ---
 
-#endif /* include_MiscUtils_hpp */
+/// Get current absolute wallclock time in seconds.
+inline double getTimeSec()
+{
+    return std::chrono::duration<double>(std::chrono::steady_clock::now().time_since_epoch()).count();
+}
+
+} // namespace ut1

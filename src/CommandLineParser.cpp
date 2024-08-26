@@ -1,9 +1,9 @@
 // Command line parser.
 //
-// Copyright (c) 2021-2022 Johannes Overmann
+// Copyright (c) 2021-2024 Johannes Overmann
 //
 // Distributed under the Boost Software License, Version 1.0.
-// (See accompanying file LICENSE_1_0.txt or copy at https://www.boost.org/LICENSE_1_0.txt)
+// (See accompanying file LICENSE or copy at https://www.boost.org/LICENSE_1_0.txt)
 
 #include <string>
 #include <vector>
@@ -110,7 +110,7 @@ CommandLineParser::Option& CommandLineParser::addOption(char shortOption, const 
 }
 
 
-void CommandLineParser::parse(int argc, char* argv[])
+void CommandLineParser::parse(int argc, const char* argv[])
 {
     // Parse arguments.
     for (int i = 1; i < argc; i++)
@@ -414,7 +414,7 @@ CommandLineParser::Option* CommandLineParser::getShortOption(char shortOption)
 }
 
 
-void CommandLineParser::parseLongOption(int argc, char* argv[], int& i)
+void CommandLineParser::parseLongOption(int argc, const char* argv[], int& i)
 {
     std::vector<std::string> fields     = ut1::splitString(argv[i] + 2, '=', 1);
     std::string              longOption = fields[0];
@@ -482,7 +482,7 @@ void CommandLineParser::parseLongOption(int argc, char* argv[], int& i)
 }
 
 
-void CommandLineParser::parseShortOptions(int argc, char* argv[], int& i)
+void CommandLineParser::parseShortOptions(int argc, const char* argv[], int& i)
 {
     for (int j = 1; argv[i][j]; j++)
     {

@@ -1,17 +1,24 @@
 // Misc utility functions.
 //
-// Copyright (c) 2021-2022 Johannes Overmann
+// Copyright (c) 2021-2024 Johannes Overmann
 //
 // Distributed under the Boost Software License, Version 1.0.
-// (See accompanying file LICENSE_1_0.txt or copy at https://www.boost.org/LICENSE_1_0.txt)
+// (See accompanying file LICENSE or copy at https://www.boost.org/LICENSE_1_0.txt)
 
 #ifndef _WIN32
 #include <unistd.h>
 #include <fcntl.h>
 #endif
 #include "MiscUtils.hpp"
+#ifdef ENABLE_UNIT_TEST
 #include "UnitTest.hpp"
+#else
+# define UNIT_TEST(name) class UnitTest_##name { void run(); }; inline void UnitTest_##name::run()
+# define ASSERT_EQ(a, b)
+#endif
+#include <iostream>
 #include <chrono>
+
 
 namespace ut1
 {
