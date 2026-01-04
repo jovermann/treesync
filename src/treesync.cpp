@@ -289,6 +289,7 @@ private:
                         }
                         break;
 
+                    default:
                     case ut1::FT_NON_EXISTING:
                         // Will never occur unless files vanish after directory scanning.
                         // Broken symbolic links are reported through FT_BROKEN_SYMLINK.
