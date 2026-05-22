@@ -525,7 +525,7 @@ int main(int argc, char* argv[])
                                   "\n"
                                   "Compare SRCDIR with DSTDIR and print differences (--diff or no option) or update DSTDIR in certain ways (--new, --delete or --update). SRCDIR is never modified.\n",
                                   "\n"
-                                  "$programName version $version *** Copyright (c) 2022-2023 Johannes Overmann *** https://github.com/jovermann/treesync",
+                                  "$programName version $version ($compileDate) *** Copyright (c) 2022-2023 Johannes Overmann *** https://github.com/jovermann/treesync",
                                   "0.1.9");
 
         cl.addHeader("\nFile/dir processing options:\n");
