@@ -208,13 +208,13 @@ private:
                 {
                     // Names and file types match. Compare content.
                     ut1::FileType type = ut1::getFileType(itsrc->second, params.followSymlinks);
-                    if (type != ut1::FT_DIR)
+                    if (type != ut1::FileType::DIR)
                     {
                         progressFiles(itsrc->second, itdst->second);
                     }
                     switch (type)
                     {
-                    case ut1::FT_REGULAR:
+                    case ut1::FileType::REGULAR:
                         if ((itsrc->second.file_size() == itdst->second.file_size()) &&
                             (params.ignoreContent || (ut1::readFile(itsrc->second.path()) == ut1::readFile(itdst->second.path()))))
                         {
@@ -227,7 +227,7 @@ private:
                         }
                         break;
 
-                    case ut1::FT_DIR:
+                    case ut1::FileType::DIR:
                         if (!params.ignoreDirs)
                         {
                             if (!processDir(itsrc->second, itdst->second))
@@ -242,7 +242,7 @@ private:
                         }
                         break;
 
-                    case ut1::FT_SYMLINK:
+                    case ut1::FileType::SYMLINK:
                         if (std::filesystem::read_symlink(itsrc->second) == std::filesystem::read_symlink(itdst->second))
                         {
                             match(itsrc->second, itdst->second);
@@ -254,8 +254,8 @@ private:
                         }
                         break;
 
-                    case ut1::FT_FIFO:
-                    case ut1::FT_SOCKET:
+                    case ut1::FileType::FIFO:
+                    case ut1::FileType::SOCKET:
                         if (!params.ignoreSpecial)
                         {
                             // Fifos and sockets have no content and always match.
@@ -268,8 +268,8 @@ private:
                         }
                         break;
 
-                    case ut1::FT_BLOCK:
-                    case ut1::FT_CHAR:
+                    case ut1::FileType::BLOCK:
+                    case ut1::FileType::CHAR:
                         if (!params.ignoreSpecial)
                         {
                             if (ut1::getStat(itsrc->second).getRDev() == ut1::getStat(itdst->second).getRDev())
@@ -290,9 +290,9 @@ private:
                         break;
 
                     default:
-                    case ut1::FT_NON_EXISTING:
+                    case ut1::FileType::NON_EXISTING:
                         // Will never occur unless files vanish after directory scanning.
-                        // Broken symbolic links are reported through FT_BROKEN_SYMLINK.
+                        // Broken symbolic links are reported as symlinks when links are not followed.
                         ignoredFile(itsrc->second);
                         ignoredFile(itdst->second);
                         break;
@@ -699,7 +699,7 @@ int main(int argc, char* argv[])
             {
                 std::string srcInfo;
                 std::string dstInfo;
-                if (ut1::getFileType(src, params_.followSymlinks) == ut1::FT_SYMLINK)
+                if (ut1::getFileType(src, params_.followSymlinks) == ut1::FileType::SYMLINK)
                 {
                     srcInfo = " -> \"" + std::filesystem::read_symlink(src).string() + "\"";
                     dstInfo = " -> \"" + std::filesystem::read_symlink(dst).string() + "\"";
