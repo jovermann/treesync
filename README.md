@@ -45,6 +45,9 @@ File/dir processing options:
      --ignore-special      Just process regular files, dirs and symbolic links. Ignore block/char devices, 
                            pipes and sockets.
   -F --ignore-forks        Ignore all files and dirs starting with '._' (Apple resource forks).
+  -x --exclude=PATTERN     Silently ignore files and dirs matching PATTERN in SRCDIR and DSTDIR. Can be 
+                           specified multiple times. Patterns with '/' match paths relative to SRCDIR or 
+                           DSTDIR, otherwise they match filenames.
      --follow-symlinks     Follow symlinks. Without this (default) symlinks are compared as distinct 
                            filesystem objects.
   -c --create-missing-dst  Create DSTDIR if it does not exist for --new/--update.
@@ -113,4 +116,3 @@ Todo
 ----
 
   * Implement copying directories step by step rather than using std::filesystem::copy() on dirs to generate appropriate verbose output.
-

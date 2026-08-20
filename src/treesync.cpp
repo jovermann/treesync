@@ -10,6 +10,7 @@
 #include <filesystem>
 #include <utility>
 #include <functional>
+#include <vector>
 #include "CommandLineParser.hpp"
 #include "MiscUtils.hpp"
 #include "UnitTest.hpp"
@@ -70,6 +71,7 @@ public:
         bool followSymlinks{};
         bool ignoreContent{};
         bool normalizeFilenames{};
+        std::vector<std::string> excludePatterns;
 
         /// Called for items which are in src only.
         std::function<void(const std::filesystem::directory_entry &, const std::filesystem::path &, Params&)> srcOnly;
@@ -115,6 +117,75 @@ public:
         return params.ignoreForksDst && ut1::hasPrefix(filename, "._");
     }
 
+    static bool wildcardMatch(const std::string& pattern, const std::string& text)
+    {
+        size_t patternPos = 0;
+        size_t textPos = 0;
+        size_t starPatternPos = std::string::npos;
+        size_t starTextPos = 0;
+
+        while (textPos < text.size())
+        {
+            if ((patternPos < pattern.size()) && ((pattern[patternPos] == '?') || (pattern[patternPos] == text[textPos])))
+            {
+                patternPos++;
+                textPos++;
+            }
+            else if ((patternPos < pattern.size()) && (pattern[patternPos] == '*'))
+            {
+                starPatternPos = patternPos++;
+                starTextPos = textPos;
+            }
+            else if (starPatternPos != std::string::npos)
+            {
+                patternPos = starPatternPos + 1;
+                textPos = ++starTextPos;
+            }
+            else
+            {
+                return false;
+            }
+        }
+
+        while ((patternPos < pattern.size()) && (pattern[patternPos] == '*'))
+        {
+            patternPos++;
+        }
+        return patternPos == pattern.size();
+    }
+
+    static bool matchesExcludePattern(const std::filesystem::path& path, const std::filesystem::path& root, const TreeDiff::Params& params)
+    {
+        if (params.excludePatterns.empty())
+        {
+            return false;
+        }
+
+        const std::string filename = path.filename().string();
+        const std::string relativePath = path.lexically_relative(root).generic_string();
+        for (const std::string& pattern: params.excludePatterns)
+        {
+            const std::string& text = ut1::contains(pattern, '/') ? relativePath : filename;
+            if (wildcardMatch(pattern, text))
+            {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /// Return true iff src file/dir should be ignored.
+    static bool ignoreSrcFile(const std::filesystem::path& path, const TreeDiff::Params& params)
+    {
+        return ignoreSrcFile(path.filename().string(), params) || matchesExcludePattern(path, params.srcdir, params);
+    }
+
+    /// Return true iff dst file/dir should be ignored.
+    static bool ignoreDstFile(const std::filesystem::path& path, const TreeDiff::Params& params)
+    {
+        return ignoreDstFile(path.filename().string(), params) || matchesExcludePattern(path, params.dstdir, params);
+    }
+
     /// Process directory trees recursively.
     void process()
     {
@@ -132,7 +203,7 @@ private:
         std::map<std::string, std::filesystem::directory_entry> srcmap;
         for (const std::filesystem::directory_entry &entry: std::filesystem::directory_iterator(src))
         {
-            if (ignoreSrcFile(entry.path().filename(), params))
+            if (ignoreSrcFile(entry.path(), params))
             {
                 continue;
             }
@@ -150,7 +221,7 @@ private:
         {
             for (const std::filesystem::directory_entry &entry: std::filesystem::directory_iterator(dst))
             {
-                if (ignoreDstFile(entry.path().filename(), params))
+                if (ignoreDstFile(entry.path(), params))
                 {
                     continue;
                 }
@@ -386,7 +457,7 @@ private:
 /// Print directory entry.
 void printDirectoryEntry(const std::filesystem::directory_entry &entry, const std::string &prefix, const std::string &suffix, const TreeDiff::Params& params, bool recursive, bool src)
 {
-    if (src ? TreeDiff::ignoreSrcFile(entry.path().filename(), params) : TreeDiff::ignoreDstFile(entry.path().filename(), params))
+    if (src ? TreeDiff::ignoreSrcFile(entry.path(), params) : TreeDiff::ignoreDstFile(entry.path(), params))
     {
         return;
     }
@@ -433,26 +504,46 @@ void mkDirs(const std::filesystem::path &dir, bool verbose, const std::string& v
 /// Remove file or directory recursively.
 /// This is similar to std::filesystem::remove_all().
 /// This functions prints verbose messages and honours dummy mode.
-void removeRecursive(const std::filesystem::path &dst, bool verbose, const std::string& verbosePrefix, bool followSymlinks, bool dummyMode)
+bool removeRecursive(const std::filesystem::path &dst, bool verbose, const std::string& verbosePrefix, const TreeDiff::Params& params, bool dummyMode)
 {
+    if (TreeDiff::ignoreDstFile(dst, params))
+    {
+        return false;
+    }
+
+    bool canRemove = true;
+
     // First remove directory contents, recursively.
     if (ut1::fsIsDirectory(dst, false))
     {
         for (const std::filesystem::directory_entry &dst_: std::filesystem::directory_iterator(dst))
         {
-           removeRecursive(dst_, verbose, verbosePrefix, followSymlinks, dummyMode);
+            if (!removeRecursive(dst_, verbose, verbosePrefix, params, dummyMode))
+            {
+                canRemove = false;
+            }
         }
+        if (!dummyMode && !std::filesystem::is_empty(dst))
+        {
+            canRemove = false;
+        }
+    }
+
+    if (!canRemove)
+    {
+        return false;
     }
 
     // Remove file or dir.
     if (verbose)
     {
-        std::cout << verbosePrefix << " " << ut1::getFileTypeStr(dst, followSymlinks) << " " << dst << "\n";
+        std::cout << verbosePrefix << " " << ut1::getFileTypeStr(dst, params.followSymlinks) << " " << dst << "\n";
     }
     if (!dummyMode)
     {
         std::filesystem::remove(dst);
     }
+    return true;
 }
 
 
@@ -463,9 +554,9 @@ void removeRecursive(const std::filesystem::path &dst, bool verbose, const std::
 /// - Honour dummy mode.
 /// - Overwrite symlinks and dirs on overwrite_existing.
 /// - Always recursive.
-void copyRecursive(const std::filesystem::directory_entry &src, const std::filesystem::path &dstdir, std::filesystem::copy_options copy_options, bool verbose, const std::string& verbosePrefix, const TreeDiff::Params& params, bool dummyMode)
+void copyRecursive(const std::filesystem::directory_entry &src, const std::filesystem::path &dstdir, std::filesystem::copy_options copy_options, bool verbose, const std::string& verbosePrefix, const TreeDiff::Params& params, bool dummyMode, bool srcSide = true)
 {
-    if (TreeDiff::ignoreSrcFile(src.path().filename(), params))
+    if (srcSide ? TreeDiff::ignoreSrcFile(src.path(), params) : TreeDiff::ignoreDstFile(src.path(), params))
     {
         return;
     }
@@ -475,7 +566,13 @@ void copyRecursive(const std::filesystem::directory_entry &src, const std::files
     // overwrite_existing does not replace symlinks or directories etc, so delete the destination first if it exists, unless both are regular files.
     if (bool(copy_options & std::filesystem::copy_options::overwrite_existing) && ut1::fsExists(dst) && ((!ut1::fsIsRegular(src, params.followSymlinks)) || (!ut1::fsIsRegular(dst, /*followSymlinks=*/false))))
     {
-        removeRecursive(dst, verbose, verbosePrefix  + ": Deleting", params.followSymlinks, dummyMode);
+        bool removed = removeRecursive(dst, verbose, verbosePrefix  + ": Deleting", params, dummyMode);
+        if (!removed && ut1::fsExists(dst) && ((!src.is_directory()) || (!ut1::fsIsDirectory(dst, /*followSymlinks=*/false))))
+        {
+            std::stringstream os;
+            os << "Cannot replace " << dst << " because excluded destination files remain.";
+            throw std::runtime_error(os.str());
+        }
     }
 
     if (src.is_directory())
@@ -493,7 +590,7 @@ void copyRecursive(const std::filesystem::directory_entry &src, const std::files
 	std::sort(entries.begin(), entries.end());
 	for (const std::filesystem::directory_entry &src_: entries)
         {
-            copyRecursive(src_, dst, copy_options, verbose, verbosePrefix, params, dummyMode);
+            copyRecursive(src_, dst, copy_options, verbose, verbosePrefix, params, dummyMode, srcSide);
         }
     }
     else
@@ -540,6 +637,7 @@ int main(int argc, char* argv[])
         cl.addOption(' ', "ignore-special", "Just process regular files, dirs and symbolic links. Ignore block/char devices, pipes and sockets.");
         cl.addOption('F', "ignore-forks", "Ignore all files and dirs in SRCDIR starting with '._' (Apple resource forks).");
         cl.addOption(' ', "ignore-forks-dst", "Ignore all files and dirs in DSTDIR starting with '._' (Apple resource forks). Specify this if -D should not remove forks in DSTDIR.");
+        cl.addOption('x', "exclude", "Silently ignore files and dirs matching PATTERN in SRCDIR and DSTDIR. Can be specified multiple times. Patterns with '/' match paths relative to SRCDIR or DSTDIR, otherwise they match filenames.", "PATTERN").listOption();
         cl.addOption(' ', "follow-symlinks", "Follow symlinks. Without this (default) symlinks are compared as distinct filesystem objects.");
         cl.addOption('c', "create-missing-dst", "Create DSTDIR if it does not exist for --new/--update.");
         cl.addOption(' ', "copy-ins", "Copy insertions to DIR during --diff. DSTDIR is not modified.", "DIR");
@@ -628,6 +726,7 @@ int main(int argc, char* argv[])
         params.followSymlinks = cl("follow-symlinks");
         params.ignoreContent = cl("ignore-content");
         params.normalizeFilenames = cl("normalize-filenames");
+        params.excludePatterns = cl.getList("exclude");
         std::filesystem::copy_options copy_options_base = params.followSymlinks ? std::filesystem::copy_options::none : std::filesystem::copy_options::copy_symlinks;
 
         params.srcOnly = ([&](const std::filesystem::directory_entry &src, const std::filesystem::path &dstdir, TreeDiff::Params &params_)
@@ -656,12 +755,12 @@ int main(int argc, char* argv[])
                 if (!copyDel.empty())
                 {
                     mkDirs(copyDel, verbose, "Creating --copy-del destination dir", dummyMode);
-                    copyRecursive(dst, copyDel, std::filesystem::copy_options::overwrite_existing | copy_options_base, verbose, "Copying (--copy-del)", params_, dummyMode);
+                    copyRecursive(dst, copyDel, std::filesystem::copy_options::overwrite_existing | copy_options_base, verbose, "Copying (--copy-del)", params_, dummyMode, /*srcSide=*/false);
                 }
             }
             if (delete_)
             {
-                removeRecursive(dst, verbose, "Deleting", params_.followSymlinks, dummyMode);
+                removeRecursive(dst, verbose, "Deleting", params_, dummyMode);
             }
         });
 
